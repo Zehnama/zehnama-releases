@@ -1,5 +1,5 @@
 Zehnama - Electronic Patient Record System
-Copyright (c) 2024-2025 Zehnama Health
+Copyright (c) 2024-2026 Zehnama Ltd
 
 This product includes software developed by third parties.
 
@@ -53,6 +53,16 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
 ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+================================================================================
+SQLite3 Multiple Ciphers
+================================================================================
+
+SQLite3 Multiple Ciphers 2.5.0 (sqlite3mc.dll) is copyright (c) 2019-2025
+Ulrich Telle, licensed under the MIT License (full text in
+THIRD_PARTY_LICENSES.txt). It encrypts the application's database files.
+SQLite itself is in the public domain.
+Source code available at: https://github.com/utelle/SQLite3MultipleCiphers
 
 ================================================================================
 Additional Dart/Flutter Packages
