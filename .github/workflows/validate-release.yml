@@ -7,9 +7,10 @@
 #
 # scripts/release.ps1 already verifies the draft before publishing it. This
 # is the second, independent look, from a clean Windows machine, at what
-# GitHub actually serves: exactly one installer plus SHA256SUMS.txt, the
-# checksum, the Authenticode signature and its publisher, the installer's own
-# version, and the pre-release flag. Installed copies make the same checks
+# GitHub actually serves: exactly one installer plus SHA256SUMS.txt and
+# RELEASE-CLASS.txt, the checksum, the Authenticode signature and its
+# publisher, the installer's own version, the release class (the file and the
+# installer's signed FileDescription agree), and the pre-release flag. Installed copies make the same checks
 # before installing, so a release that fails here would be refused by every
 # client anyway - turning it back into a draft (invisible to clients) stops
 # them downloading it at all.
@@ -81,14 +82,15 @@ jobs:
             throw "$tag is marked pre-release=$($release.isPrerelease), but version $version $(if ($expectPrerelease) { 'has' } else { 'has no' }) pre-release part. A beta is a GitHub pre-release; a stable release is not."
           }
 
-          # Exactly the installer and its checksum file.
+          # Exactly the installer, its checksum file and its class file.
           $assets = @($release.assets)
           $names = @($assets | ForEach-Object { $_.name })
           $exes = @($names | Where-Object { $_ -like '*.exe' })
           if ($exes.Count -ne 1) { throw "$tag carries $($exes.Count) .exe assets; it must carry exactly one." }
           if ($exes[0] -cne $exeName) { throw "The installer is '$($exes[0])'; for $tag it must be '$exeName'." }
           if ($names -cnotcontains 'SHA256SUMS.txt') { throw "$tag has no SHA256SUMS.txt; installed copies never offer it." }
-          if ($assets.Count -ne 2) { throw "$tag carries $($assets.Count) assets ($($names -join ', ')); it must carry exactly $exeName and SHA256SUMS.txt." }
+          if ($names -cnotcontains 'RELEASE-CLASS.txt') { throw "$tag has no RELEASE-CLASS.txt; scripts/release.ps1 stages one for every release." }
+          if ($assets.Count -ne 3) { throw "$tag carries $($assets.Count) assets ($($names -join ', ')); it must carry exactly $exeName, SHA256SUMS.txt and RELEASE-CLASS.txt." }
 
           $dir = Join-Path $env:RUNNER_TEMP 'release'
           New-Item -ItemType Directory -Path $dir -Force | Out-Null
@@ -124,8 +126,23 @@ jobs:
             throw "$exeName reports ProductVersion '$productVersion'; the tag says '$version'."
           }
 
-          Write-Host "$tag is valid: $exeName, SHA-256 $hash, signed by $subject (timestamped), ProductVersion $version, pre-release=$expectPrerelease."
-          "### ${tag}: valid`n`n- ``$exeName``, SHA-256 ``$hash```n- Signed by ``$subject``, timestamped`n- ProductVersion ``$version``, pre-release: $expectPrerelease" |
+          # Release class (update entitlement): one "class: critical|feature"
+          # line, and the installer's signed FileDescription says the same -
+          # an installed copy past its feature-update date refuses a critical
+          # download whose installer does not.
+          $classLines = @(Get-Content -LiteralPath (Join-Path $dir 'RELEASE-CLASS.txt') | Where-Object { $_.Trim() -ne '' })
+          if ($classLines.Count -ne 1) { throw "RELEASE-CLASS.txt holds $($classLines.Count) lines; it must hold exactly one." }
+          $classLine = [regex]::Match($classLines[0].Trim(), '^class: (critical|feature)\z')
+          if (-not $classLine.Success) { throw "RELEASE-CLASS.txt's line is not 'class: critical' or 'class: feature'." }
+          $releaseClass = $classLine.Groups[1].Value
+          $description = "$((Get-Item -LiteralPath $exePath).VersionInfo.FileDescription)"
+          $declared = [regex]::Match($description, 'release-class:\s*([A-Za-z]+)', 'IgnoreCase')
+          if (-not $declared.Success -or $declared.Groups[1].Value.ToLowerInvariant() -cne $releaseClass) {
+            throw "$exeName's FileDescription is '$($description.Trim())'; RELEASE-CLASS.txt says '$releaseClass'."
+          }
+
+          Write-Host "$tag is valid: $exeName, SHA-256 $hash, signed by $subject (timestamped), ProductVersion $version, class $releaseClass, pre-release=$expectPrerelease."
+          "### ${tag}: valid`n`n- ``$exeName``, SHA-256 ``$hash```n- Signed by ``$subject``, timestamped`n- ProductVersion ``$version``, class: $releaseClass, pre-release: $expectPrerelease" |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
       - name: Return the release to draft
